@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Agajayofficial VPS — Owner Panel</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="side-brand">
+      <div class="logo">A</div>
+      <h2>Agajayofficial <span style="color:var(--accent)">·</span> Owner</h2>
+    </div>
+    <nav class="nav">
+      <a class="active" data-tab="users">👥 Users</a>
+      <a data-tab="servers">🖥️ Servers</a>
+      <a data-tab="files">📁 Files</a>
+      <a data-tab="modules">📦 Modules</a>
+    </nav>
+    <div class="side-foot">
+      <div>👑 <b>Owner</b> · Unlimited ♾️</div>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="title">Users</h1>
+      <div class="userchip"><span>Agajayofficial</span><span class="role">OWNER</span></div>
+    </div>
+
+    <!-- USERS -->
+    <section id="tab-users" class="section">
+      <h2>Create user</h2>
+      <p class="desc">Set username, password, expiry (days) and max files. Leave a limit blank for unlimited.</p>
+      <form id="userForm" class="inline">
+        <label>Username<input name="username" required /></label>
+        <label>Password<input name="password" required /></label>
+        <label>Expires in (days)<input name="days" type="number" min="1" placeholder="∞" /></label>
+        <label>Max files<input name="maxFiles" type="number" min="1" placeholder="∞" /></label>
+        <button class="btn btn-primary btn-sm" type="submit">Create user</button>
+      </form>
+      <p id="uErr" class="err"></p>
+
+      <hr class="divider" />
+      <h2>All users</h2>
+      <table id="userTable">
+        <thead><tr>
+          <th>Username</th><th>Role</th><th>Created</th><th>Expires</th><th>Max files</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- SERVERS -->
+    <section id="tab-servers" class="section" hidden>
+      <h2>All servers</h2>
+      <p class="desc">Every server across every user. Owner can start, stop, delete and view logs.</p>
+      <div id="serverList" class="grid grid-3"></div>
+    </section>
+
+    <!-- FILES -->
+    <section id="tab-files" class="section" hidden>
+      <h2>Owner files</h2>
+      <p class="desc">Upload your own files and run them with unlimited quota.</p>
+      <form id="uploadForm" class="inline" style="margin-bottom: 16px;">
+        <input type="file" name="files" multiple required />
+        <button class="btn btn-primary btn-sm" type="submit">Upload</button>
+      </form>
+      <div id="fileList"></div>
+    </section>
+
+    <!-- MODULES -->
+    <section id="tab-modules" class="section" hidden>
+      <h2>Install modules</h2>
+      <p class="desc"><code>pip install &lt;module&gt;</code> for Python, or <code>pkg install &lt;module&gt;</code> for system packages.</p>
+      <form id="modForm" class="inline">
+        <label>Manager
+          <select name="manager"><option value="pip">pip</option><option value="pkg">pkg (apt)</option></select>
+        </label>
+        <label>Module<input name="name" required /></label>
+        <button class="btn btn-primary btn-sm" type="submit">Install</button>
+      </form>
+      <hr class="divider" />
+      <div id="modOut" class="logs" style="height: 280px;"></div>
+    </section>
+
+    <!-- LOGS -->
+    <section id="tab-logs" class="section" hidden>
+      <div class="topbar" style="margin-bottom:12px;">
+        <h2 id="logsTitle">Logs</h2>
+        <button class="btn btn-ghost btn-sm" onclick="showTab('servers')">← Back</button>
+      </div>
+      <div id="logsView" class="logs"></div>
+    </section>
+  </main>
+</div>
+
+<button class="fab" id="fab" title="Create server">+</button>
+
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3>Create new server</h3>
+    <p class="desc">Run one of your uploaded files as a long-running server.</p>
+    <form id="srvForm" class="form">
+      <label>Server name<input name="name" required /></label>
+      <label>File<select name="file" id="srvFile" required></select></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" type="submit">Create</button>
+      </div>
+      <p id="srvErr" class="err"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+async function api(p, opts={}) {
+  const r = await fetch(p, { headers:{'Content-Type':'application/json'}, ...opts });
+  if (r.status === 401) { location.href='/login.html'; return; }
+  return r;
+}
+async function logout(){ await fetch('/api/logout',{method:'POST'}); location.href='/login.html'; }
+
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(s => s.hidden = true);
+  document.getElementById('tab-'+name).hidden = false;
+  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.tab===name));
+  document.getElementById('title').textContent = ({users:'Users',servers:'All Servers',files:'Files',modules:'Modules',logs:'Logs'})[name];
+  if (name==='users') loadUsers();
+  if (name==='servers') loadServers();
+  if (name==='files') loadFiles();
+}
+document.querySelectorAll('.nav a').forEach(a=>a.addEventListener('click',()=>showTab(a.dataset.tab)));
+
+// ---------- Users ----------
+async function loadUsers() {
+  const list = await (await api('/api/owner/users')).json();
+  const rows = list.map(u => `
+    <tr>
+      <td><b>${u.username}</b></td>
+      <td>${u.role}</td>
+      <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+      <td>${u.expiresAt ? new Date(u.expiresAt).toLocaleDateString() : '♾️'}</td>
+      <td>${u.maxFiles ?? '♾️'}</td>
+      <td>${u.expired ? '<span style="color:var(--danger)">expired</span>' : '<span style="color:var(--success)">active</span>'}</td>
+      <td>${u.role==='owner' ? '' : `<button class="btn btn-danger btn-sm" onclick="delUser('${u.username}')">Delete</button>`}</td>
+    </tr>`).join('');
+  document.querySelector('#userTable tbody').innerHTML = rows;
+}
+async function delUser(u){ if(!confirm('Delete '+u+'?'))return; await api('/api/owner/users/'+u,{method:'DELETE'}); loadUsers(); }
+
+document.getElementById('userForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const r = await api('/api/owner/users', { method:'POST', body: JSON.stringify(data) });
+  const j = await r.json();
+  document.getElementById('uErr').textContent = j.error || '';
+  if (r.ok) { e.target.reset(); loadUsers(); }
+});
+loadUsers();
+
+// ---------- Files ----------
+async function loadFiles() {
+  const list = await (await api('/api/files')).json();
+  document.getElementById('fileList').innerHTML = list.length ? list.map(f=>
+    `<div class="file-row">
+       <div><div class="name">${f.name}</div><div class="size">${(f.size/1024).toFixed(1)} KB</div></div>
+       <button class="btn btn-danger btn-sm" onclick="delFile('${f.name.replace(/'/g,"\\'")}')">Delete</button>
+     </div>`).join('') : '<p class="muted">No files yet.</p>';
+}
+async function delFile(n){ await fetch('/api/files/'+encodeURIComponent(n),{method:'DELETE'}); loadFiles(); }
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await fetch('/api/files/upload',{method:'POST',body:fd});
+  e.target.reset(); loadFiles();
+});
+
+// ---------- Servers ----------
+async function loadServers() {
+  const list = await (await api('/api/servers')).json();
+  document.getElementById('serverList').innerHTML = list.length ? list.map(s=>`
+    <div class="server-card">
+      <div class="row"><h3>${s.name}</h3><span class="status ${s.status}">${s.status}</span></div>
+      <div class="file-name">👤 ${s.owner} · ▶ ${s.file}</div>
+      <div class="actions">
+        ${s.status==='running'
+          ? `<button class="btn btn-danger btn-sm" onclick="stopSrv('${s.id}')">Stop</button>`
+          : `<button class="btn btn-success btn-sm" onclick="startSrv('${s.id}')">Start</button>`}
+        <button class="btn btn-ghost btn-sm" onclick="openLogs('${s.id}','${s.name.replace(/'/g,"\\'")}')">Logs</button>
+        <button class="btn btn-ghost btn-sm" onclick="delSrv('${s.id}')">Delete</button>
+      </div>
+    </div>`).join('') : '<p class="muted">No servers yet.</p>';
+}
+async function startSrv(id){ await api('/api/servers/'+id+'/start',{method:'POST'}); loadServers(); }
+async function stopSrv(id){ await api('/api/servers/'+id+'/stop',{method:'POST'}); loadServers(); }
+async function delSrv(id){ if(!confirm('Delete?'))return; await api('/api/servers/'+id,{method:'DELETE'}); loadServers(); }
+
+let logsES = null;
+function openLogs(id, name) {
+  showTab('logs');
+  document.getElementById('logsTitle').textContent = 'Logs · ' + name;
+  const view = document.getElementById('logsView'); view.innerHTML = '';
+  if (logsES) logsES.close();
+  logsES = new EventSource('/api/servers/'+id+'/logs');
+  logsES.onmessage = e => {
+    const line = JSON.parse(e.data);
+    const div = document.createElement('div');
+    if (line.startsWith('[system]')) div.className='sys';
+    else if (line.startsWith('[err]')) div.className='err';
+    div.textContent = line;
+    view.appendChild(div); view.scrollTop = view.scrollHeight;
+  };
+}
+
+const modal = document.getElementById('modal');
+document.getElementById('fab').addEventListener('click', async () => {
+  const files = await (await api('/api/files')).json();
+  document.getElementById('srvFile').innerHTML = files.length
+    ? files.map(f=>`<option value="${f.name}">${f.name}</option>`).join('')
+    : '<option disabled>Upload a file first</option>';
+  modal.classList.add('show');
+});
+function closeModal(){ modal.classList.remove('show'); }
+modal.addEventListener('click', e=>{ if(e.target===modal) closeModal(); });
+document.getElementById('srvForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const r = await api('/api/servers',{method:'POST',body:JSON.stringify(data)});
+  const j = await r.json();
+  if (!r.ok) { document.getElementById('srvErr').textContent=j.error; return; }
+  closeModal(); e.target.reset(); showTab('servers');
+});
+
+// ---------- Modules ----------
+document.getElementById('modForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const out = document.getElementById('modOut');
+  out.textContent = '> '+(data.manager==='pip'?'pip install ':'apt-get install -y ')+data.name+'\n';
+  const r = await api('/api/install',{method:'POST',body:JSON.stringify(data)});
+  const j = await r.json();
+  out.textContent += (j.stdout||'')+'\n'+(j.stderr||'')+'\n'+(j.ok?'✓ done':'✗ failed');
+});
+</script>
+</body>
+</html>

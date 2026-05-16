@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>AJAY VPS — Dashboard</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="side-brand">
+      <div class="logo">A</div>
+      <h2>AJAY VPS</h2>
+    </div>
+    <nav class="nav">
+      <a class="active" data-tab="pricing">💎 Pricing</a>
+      <a data-tab="servers">🖥️ My Servers</a>
+      <a data-tab="files">📁 Files</a>
+      <a data-tab="modules">📦 Modules</a>
+    </nav>
+    <div class="side-foot">
+      <div id="meinfo"></div>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 id="title">Pricing</h1>
+      <div class="userchip"><span id="uname"></span><span class="role" id="urole"></span></div>
+    </div>
+
+    <!-- PRICING -->
+    <section id="tab-pricing" class="section">
+      <h2>Plans built for builders</h2>
+      <p class="desc">Choose the plan that fits your workload. Cancel anytime.</p>
+      <div class="grid grid-3" style="margin-top: 18px;">
+        <div class="price-card">
+          <div class="tier">Starter</div>
+          <div class="price">$3<small>/mo</small></div>
+          <ul>
+            <li>1 vCPU · 1 GB RAM</li>
+            <li>20 GB SSD storage</li>
+            <li>1 server slot</li>
+            <li>Community support</li>
+          </ul>
+        </div>
+        <div class="price-card featured">
+          <span class="badge-best">Most popular</span>
+          <div class="tier">Pro</div>
+          <div class="price">$9<small>/mo</small></div>
+          <ul>
+            <li>2 vCPU · 4 GB RAM</li>
+            <li>80 GB NVMe storage</li>
+            <li>5 server slots</li>
+            <li>Priority 24/7 support</li>
+            <li>pip & apt module install</li>
+          </ul>
+        </div>
+        <div class="price-card">
+          <div class="tier">Business</div>
+          <div class="price">$24<small>/mo</small></div>
+          <ul>
+            <li>4 vCPU · 8 GB RAM</li>
+            <li>200 GB NVMe storage</li>
+            <li>Unlimited servers</li>
+            <li>Dedicated IP</li>
+            <li>Daily backups</li>
+          </ul>
+        </div>
+        <div class="price-card">
+          <div class="tier">Enterprise</div>
+          <div class="price">Custom</div>
+          <ul>
+            <li>Dedicated CPU cores</li>
+            <li>16+ GB RAM</li>
+            <li>SLA 99.99%</li>
+            <li>White-label panel</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- SERVERS -->
+    <section id="tab-servers" class="section" hidden>
+      <h2>My Servers</h2>
+      <p class="desc">Spin up servers from your uploaded scripts. Click + to create a new one.</p>
+      <div id="serverList" class="grid grid-3"></div>
+    </section>
+
+    <!-- FILES -->
+    <section id="tab-files" class="section" hidden>
+      <h2>Files</h2>
+      <p class="desc">Upload Python, Node.js, Bash or any project files.</p>
+      <form id="uploadForm" class="inline" style="margin-bottom: 16px;">
+        <input type="file" name="files" multiple required />
+        <button class="btn btn-primary btn-sm" type="submit">Upload</button>
+      </form>
+      <div id="fileList"></div>
+      <p id="fileErr" class="err"></p>
+    </section>
+
+    <!-- MODULES -->
+    <section id="tab-modules" class="section" hidden>
+      <h2>Install modules</h2>
+      <p class="desc">Use <code>pip</code> for Python packages or <code>pkg</code> for system packages (apt).</p>
+      <form id="modForm" class="inline">
+        <label>Manager
+          <select name="manager">
+            <option value="pip">pip</option>
+            <option value="pkg">pkg (apt)</option>
+          </select>
+        </label>
+        <label>Module name
+          <input name="name" placeholder="e.g. requests, ffmpeg" required />
+        </label>
+        <button class="btn btn-primary btn-sm" type="submit">Install</button>
+      </form>
+      <hr class="divider" />
+      <div id="modOut" class="logs" style="height: 280px;"></div>
+    </section>
+
+    <!-- LOGS -->
+    <section id="tab-logs" class="section" hidden>
+      <div class="topbar" style="margin-bottom: 12px;">
+        <h2 id="logsTitle">Logs</h2>
+        <button class="btn btn-ghost btn-sm" onclick="showTab('servers')">← Back</button>
+      </div>
+      <div id="logsView" class="logs"></div>
+    </section>
+  </main>
+</div>
+
+<button class="fab" id="fab" title="Create server">+</button>
+
+<!-- Modal: create server -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <h3>Create new server</h3>
+    <p class="desc">Pick an uploaded file to run as a server.</p>
+    <form id="srvForm" class="form">
+      <label>Server name<input name="name" required placeholder="my-bot" /></label>
+      <label>File<select name="file" id="srvFile" required></select></label>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" type="submit">Create</button>
+      </div>
+      <p id="srvErr" class="err"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+let ME = null;
+async function api(p, opts={}) {
+  const r = await fetch(p, { headers: {'Content-Type':'application/json'}, ...opts });
+  if (r.status === 401) { location.href='/login.html'; return; }
+  return r;
+}
+async function logout(){ await fetch('/api/logout',{method:'POST'}); location.href='/login.html'; }
+
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(s => s.hidden = true);
+  document.getElementById('tab-'+name).hidden = false;
+  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.tab===name));
+  document.getElementById('title').textContent = ({pricing:'Pricing',servers:'My Servers',files:'Files',modules:'Modules',logs:'Logs'})[name] || name;
+  if (name === 'servers') loadServers();
+  if (name === 'files') loadFiles();
+}
+document.querySelectorAll('.nav a').forEach(a=>a.addEventListener('click',()=>showTab(a.dataset.tab)));
+
+async function init() {
+  const r = await api('/api/me');
+  if (!r) return;
+  ME = await r.json();
+  document.getElementById('uname').textContent = ME.username;
+  document.getElementById('urole').textContent = ME.role;
+  const exp = ME.expiresAt ? new Date(ME.expiresAt).toLocaleDateString() : '♾️ unlimited';
+  const max = ME.maxFiles ?? '♾️';
+  document.getElementById('meinfo').innerHTML =
+    `<div>👤 <b>${ME.username}</b></div><div>Expires: ${exp}</div><div>File limit: ${max}</div>`;
+}
+init();
+
+// ---------- Files ----------
+async function loadFiles() {
+  const list = await (await api('/api/files')).json();
+  const html = list.length ? list.map(f =>
+    `<div class="file-row">
+       <div><div class="name">${f.name}</div><div class="size">${(f.size/1024).toFixed(1)} KB</div></div>
+       <button class="btn btn-danger btn-sm" onclick="delFile('${f.name.replace(/'/g,"\\'")}')">Delete</button>
+     </div>`
+  ).join('') : '<p class="muted">No files yet. Upload one above.</p>';
+  document.getElementById('fileList').innerHTML = html;
+}
+async function delFile(name) {
+  await fetch('/api/files/'+encodeURIComponent(name), {method:'DELETE'});
+  loadFiles();
+}
+document.getElementById('uploadForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch('/api/files/upload', { method:'POST', body: fd });
+  const j = await r.json();
+  document.getElementById('fileErr').textContent = j.error || '';
+  e.target.reset();
+  loadFiles();
+});
+
+// ---------- Servers ----------
+async function loadServers() {
+  const list = await (await api('/api/servers')).json();
+  const el = document.getElementById('serverList');
+  if (!list.length) { el.innerHTML = '<p class="muted">No servers yet. Click + to create one.</p>'; return; }
+  el.innerHTML = list.map(s => `
+    <div class="server-card">
+      <div class="row"><h3>${s.name}</h3><span class="status ${s.status}">${s.status}</span></div>
+      <div class="file-name">▶ ${s.file}</div>
+      <div class="actions">
+        ${s.status==='running'
+          ? `<button class="btn btn-danger btn-sm" onclick="stopSrv('${s.id}')">Stop</button>`
+          : `<button class="btn btn-success btn-sm" onclick="startSrv('${s.id}')">Start</button>`}
+        <button class="btn btn-ghost btn-sm" onclick="openLogs('${s.id}','${s.name.replace(/'/g,"\\'")}')">Logs</button>
+        <button class="btn btn-ghost btn-sm" onclick="delSrv('${s.id}')">Delete</button>
+      </div>
+    </div>`).join('');
+}
+async function startSrv(id){ await api('/api/servers/'+id+'/start',{method:'POST'}); loadServers(); }
+async function stopSrv(id){ await api('/api/servers/'+id+'/stop',{method:'POST'}); loadServers(); }
+async function delSrv(id){ if(!confirm('Delete server?'))return; await api('/api/servers/'+id,{method:'DELETE'}); loadServers(); }
+
+let logsES = null;
+function openLogs(id, name) {
+  showTab('logs');
+  document.getElementById('logsTitle').textContent = 'Logs · ' + name;
+  const view = document.getElementById('logsView');
+  view.innerHTML = '';
+  if (logsES) logsES.close();
+  logsES = new EventSource('/api/servers/'+id+'/logs');
+  logsES.onmessage = e => {
+    const line = JSON.parse(e.data);
+    const div = document.createElement('div');
+    if (line.startsWith('[system]')) div.className = 'sys';
+    else if (line.startsWith('[err]')) div.className = 'err';
+    div.textContent = line;
+    view.appendChild(div);
+    view.scrollTop = view.scrollHeight;
+  };
+}
+
+// ---------- Modal create server ----------
+const modal = document.getElementById('modal');
+document.getElementById('fab').addEventListener('click', async () => {
+  const files = await (await api('/api/files')).json();
+  const sel = document.getElementById('srvFile');
+  sel.innerHTML = files.length
+    ? files.map(f=>`<option value="${f.name}">${f.name}</option>`).join('')
+    : '<option disabled>No files — upload first</option>';
+  modal.classList.add('show');
+});
+function closeModal(){ modal.classList.remove('show'); document.getElementById('srvErr').textContent=''; }
+modal.addEventListener('click', e => { if (e.target===modal) closeModal(); });
+document.getElementById('srvForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const r = await api('/api/servers', { method:'POST', body: JSON.stringify(data) });
+  const j = await r.json();
+  if (!r.ok) { document.getElementById('srvErr').textContent = j.error; return; }
+  closeModal(); e.target.reset(); showTab('servers');
+});
+
+// ---------- Modules ----------
+document.getElementById('modForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  const out = document.getElementById('modOut');
+  out.textContent = '> '+(data.manager==='pip'?'pip install ':'apt-get install -y ')+data.name+'\n';
+  const r = await api('/api/install', { method:'POST', body: JSON.stringify(data) });
+  const j = await r.json();
+  out.textContent += (j.stdout||'') + '\n' + (j.stderr||'') + '\n' + (j.ok?'✓ done':'✗ failed');
+});
+</script>
+</body>
+</html>

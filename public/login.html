@@ -1,1 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Agajayofficial VPS — Login</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="auth-body">
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
 
+  <main class="auth-card">
+    <div class="brand">
+      <div class="logo">A</div>
+      <div>
+        <h1>Agajay VPS</h1>
+        <p class="muted">Professional cloud hosting panel</p>
+      </div>
+    </div>
+
+    <form id="loginForm" class="form">
+      <label>Username
+        <input name="username" autocomplete="username" required />
+      </label>
+      <label>Password
+        <input name="password" type="password" autocomplete="current-password" required />
+      </label>
+      <button class="btn btn-primary" type="submit">Sign in</button>
+      <p id="err" class="err"></p>
+    </form>
+
+    <footer class="auth-foot">
+      <span>© AgajayOfficial</span>
+      <span class="dot">•</span>
+      <span>Powered by Railway</span>
+    </footer>
+  </main>
+
+<script>
+const f = document.getElementById('loginForm');
+const err = document.getElementById('err');
+f.addEventListener('submit', async e => {
+  e.preventDefault();
+  err.textContent = '';
+  const data = Object.fromEntries(new FormData(f));
+  const r = await fetch('/api/login', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(data),
+  });
+  const j = await r.json();
+  if (!r.ok) { err.textContent = j.error || 'Login failed'; return; }
+  location.href = j.redirect;
+});
+</script>
+</body>
+</html>
